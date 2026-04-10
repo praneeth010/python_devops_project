@@ -2,34 +2,66 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "your-dockerhub-username/python-devops-app"
+        IMAGE_NAME = "praneeth0108/python-devops-app"
+        TAG = "${BUILD_NUMBER}"
+        GIT_REPO = "https://github.com/praneeth010/python_Application_Argocd.git"
+        GIT_BRANCH = "main"
     }
 
     stages {
-        stage('Clone') {
+
+        stage('Clone App Repo') {
             steps {
-                git 'https://github.com/your-repo.git'
+                git 'https://github.com/praneeth010/python_devops_project.git'
             }
         }
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t $IMAGE_NAME .'
+                sh 'docker build -t $IMAGE_NAME:$TAG .'
             }
         }
 
-        stage('Push to Docker Hub') {
+        stage('Push Docker Image') {
             steps {
-                withCredentials([usernamePassword(credentialsId: 'dockerhub-creds', usernameVariable: 'USER', passwordVariable: 'PASS')]) {
-                    sh 'echo $PASS | docker login -u $USER --password-stdin'
-                    sh 'docker push $IMAGE_NAME'
+                withCredentials([usernamePassword(
+                    credentialsId: 'dockerhub-creds',
+                    usernameVariable: 'praneeth0108',
+                    passwordVariable: 'Praneeth@0108'
+                )]) {
+                    sh '''
+                    echo $DOCKER_PASS | docker login -u $DOCKER_USER --password-stdin
+                    docker push $IMAGE_NAME:$TAG
+                    '''
                 }
             }
         }
 
-        stage('Run Container') {
+        stage('Update ArgoCD Repo') {
             steps {
-                sh 'docker run -d -p 5000:5000 $IMAGE_NAME'
+                dir('argocd-repo') {
+                    git branch: "${GIT_BRANCH}", url: "${GIT_REPO}"
+
+                    sh """
+                    sed -i 's|image: .*|image: $IMAGE_NAME:$TAG|' deployment.yaml
+                    """
+
+                    withCredentials([usernamePassword(
+                        credentialsId: 'github-creds',
+                        usernameVariable: 'ratnalapraneeth@gmail.com',
+                        passwordVariable: 'Praneeth@0108'
+                    )]) {
+                        sh '''
+                        git config user.email "ratnalapraneeth@gmail.com"
+                        git config user.name "praneeth010"
+
+                        git add .
+                        git commit -m "Update image to $IMAGE_NAME:$TAG" || true
+
+                        git push https://$GIT_USER:$GIT_PASS@github.com/praneeth010/python_Application_Argocd.git HEAD:main
+                        '''
+                    }
+                }
             }
         }
     }
