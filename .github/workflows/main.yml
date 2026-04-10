@@ -1,4 +1,4 @@
-name: CI-CD Pipeline
+name: CI-CD Pipeline (Docker + ArgoCD)
 
 on:
   push:
@@ -14,42 +14,43 @@ jobs:
 
     steps:
 
-    # ✅ Checkout App Repo
-    - name: Checkout Code
+    # ✅ 1. Checkout Application Code
+    - name: Checkout App Repo
       uses: actions/checkout@v3
 
-    # ✅ Set Tag (Build Number)
-    - name: Set Tag
+    # ✅ 2. Set Dynamic Tag
+    - name: Set Image Tag
       run: echo "TAG=${GITHUB_RUN_NUMBER}" >> $GITHUB_ENV
 
-    # ✅ Login to DockerHub
+    # ✅ 3. Login to DockerHub
     - name: Docker Login
-      run: echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
+      run: |
+        echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
 
-    # ✅ Build Image
+    # ✅ 4. Build Docker Image
     - name: Build Docker Image
       run: docker build -t $IMAGE_NAME:$TAG .
 
-    # ✅ Push Image
+    # ✅ 5. Push Docker Image
     - name: Push Docker Image
       run: docker push $IMAGE_NAME:$TAG
 
-    # ✅ Clone ArgoCD Repo
+    # ✅ 6. Clone ArgoCD Repo
     - name: Clone ArgoCD Repo
       run: |
         git clone https://github.com/praneeth010/python_Application_Argocd.git
-        cd python_Application_Argocd
 
-    # ✅ Update Deployment YAML
-    - name: Update Image in YAML
+    # ✅ 7. Update deployment.yaml with new image
+    - name: Update Kubernetes YAML
       run: |
         cd python_Application_Argocd
-        sed -i 's|image: .*|image: '$IMAGE_NAME':'$TAG'|' deployment.yaml
+        sed -i "s|image: .*|image: $IMAGE_NAME:$TAG|" deployment.yaml
 
-    # ✅ Commit & Push Changes
-    - name: Push Changes to GitHub
+    # ✅ 8. Commit & Push Changes (FIXED ✅)
+    - name: Push Changes to ArgoCD Repo
       run: |
         cd python_Application_Argocd
+
         git config user.email "ratnalapraneeth@gmail.com"
         git config user.name "praneeth010"
 
