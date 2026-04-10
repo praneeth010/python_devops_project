@@ -1,0 +1,59 @@
+name: CI-CD Pipeline
+
+on:
+  push:
+    branches:
+      - main
+
+env:
+  IMAGE_NAME: praneeth0108/python-devops-app
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+
+    # ✅ Checkout App Repo
+    - name: Checkout Code
+      uses: actions/checkout@v3
+
+    # ✅ Set Tag (Build Number)
+    - name: Set Tag
+      run: echo "TAG=${GITHUB_RUN_NUMBER}" >> $GITHUB_ENV
+
+    # ✅ Login to DockerHub
+    - name: Docker Login
+      run: echo "${{ secrets.DOCKER_PASS }}" | docker login -u "${{ secrets.DOCKER_USER }}" --password-stdin
+
+    # ✅ Build Image
+    - name: Build Docker Image
+      run: docker build -t $IMAGE_NAME:$TAG .
+
+    # ✅ Push Image
+    - name: Push Docker Image
+      run: docker push $IMAGE_NAME:$TAG
+
+    # ✅ Clone ArgoCD Repo
+    - name: Clone ArgoCD Repo
+      run: |
+        git clone https://github.com/praneeth010/python_Application_Argocd.git
+        cd python_Application_Argocd
+
+    # ✅ Update Deployment YAML
+    - name: Update Image in YAML
+      run: |
+        cd python_Application_Argocd
+        sed -i 's|image: .*|image: '$IMAGE_NAME':'$TAG'|' deployment.yaml
+
+    # ✅ Commit & Push Changes
+    - name: Push Changes to GitHub
+      run: |
+        cd python_Application_Argocd
+        git config user.email "ratnalapraneeth@gmail.com"
+        git config user.name "praneeth010"
+
+        git add .
+        git commit -m "Update image to $IMAGE_NAME:$TAG" || echo "No changes"
+
+        git push https://${{ secrets.GIT_USER }}:${{ secrets.GIT_TOKEN }}@github.com/praneeth010/python_Application_Argocd.git HEAD:main
